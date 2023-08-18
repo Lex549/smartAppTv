@@ -1,43 +1,105 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:youtube_player_flutter/youtube_player_flutter.dart';
 
-class _PlayerScreen extends StatefulWidget {
-  const _PlayerScreen({super.key});
+class PlayerScreen extends StatefulWidget {
+  final String url;
+  const PlayerScreen({Key? key, required this.url}) : super(key: key);
 
   @override
-  State<_PlayerScreen> createState() => __PlayerScreenState();
+  State<PlayerScreen> createState() => _PlayerScreenState();
 }
 
-class __PlayerScreenState extends State<_PlayerScreen> {
+class _PlayerScreenState extends State<PlayerScreen> {
   late YoutubePlayerController _controller;
   late TextEditingController _idController;
-  late TextEditingController _seekController;
+  late TextEditingController _seekToController;
   late PlayerState _playerState;
   late YoutubeMetaData _videoMetaData;
   bool _isPlayerReady = false;
   late String _videoId;
 
 
-
-@override
-void initState(){
-super.initState();
-_videoId = YoutubePlayer.convertUrlToId(widget.url).toString();
-_controller = YoutubePlayerController(
-initialVideoId: _videoId,
-flags: const YoutubePlayerFlags(
-  mute: false,
-  autoPlay: true,
-  disableDragSeek: false,
-  loop: false,
-  isLive: false,
-  forceHD: false,
-  enableCaption: true ) ); 
-   ..addListener(listener); 
+  @override
+  void initState() {
+    super.initState();
+    _videoId = YoutubePlayer.convertUrlToId(widget.url).toString();
+    _controller = YoutubePlayerController(
+      initialVideoId: _videoId,
+      flags: const YoutubePlayerFlags(
+        mute: false,
+        autoPlay: true,
+        disableDragSeek: false,
+        loop: false,
+        isLive: false,
+        forceHD: false,
+        enableCaption: true,
+      )
+    )
+    ..addListener(listener);
+    _idController = TextEditingController();
+    _seekToController = TextEditingController();
+    _videoMetaData = const YoutubeMetaData();
+    _playerState = PlayerState.unknown;
   }
 
-  
+  void listener() {
+    if (_isPlayerReady && mounted && !_controller.value.isFullScreen) {
+      setState(() {
+        _playerState = _controller.value.playerState;
+        _videoMetaData = _controller.metadata;
+      });
+    }
+  }
+
+  void dispose() {
+    _controller.dispose();
+    _idController.dispose();
+    _seekToController.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Container();
+    return YoutubePlayerBuilder(
+      onExitFullScreen: (){
+        SystemChrome.setPreferredOrientations(DeviceOrientation.values);
+      },
+      player: YoutubePlayer(
+        controller: _controller,
+        showVideoProgressIndicator: true,
+        progressIndicatorColor: Colors.redAccent,
+        topActions: <Widget>[
+          const SizedBox(width: 8.0),
+          Expanded(
+            child: Text(
+              _controller.metadata.title,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 18.0,
+              ),
+              overflow: TextOverflow.ellipsis,
+              maxLines: 1,
+            ),
+          )
+        ],
+        onReady: () {
+          _isPlayerReady = true;
+        },
+        onEnded: (data) {
+          Navigator.pop(context);
+        },
+      ),
+      builder: (context,player) => Scaffold(
+        body: player,
+      )
+    );
+  }
+  @override
+  void debugFillProperties(DiagnosticPropertiesBuilder properties) {
+    super.debugFillProperties(properties);
+    properties.add(EnumProperty<PlayerState>('_playerState', _playerState));
+    properties.add(DiagnosticsProperty<YoutubeMetaData>('_videoMetaData', _videoMetaData));
   }
 }
